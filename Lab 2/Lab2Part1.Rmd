@@ -1,19 +1,24 @@
-####### Data Analytics Fall 2024 Lab 01 ######
-
+```{r}
 library(ggplot2)
+```
 
-### set working directory
+#set working directory
+```{r}
 setwd("D:/titta/RPI2024/Courses/Data Analytics/DataAnalytics2024_Sampoorna/Lab 2")
+```
 
-### read in data
+#read EPI data
+```{r}
+
 epi.results <- read.csv("epi2024results06022024.csv", header=TRUE)
 epi.weights <- read.csv("epi2024weights.csv")
 
 View(epi.results)
 View(epi.weights)
+```
 
-#### Exploratory Analysis ####
-
+# Exploratory Analysis
+```{r}
 epi.results$EPI.new
 
 epi.results[1,5]
@@ -134,14 +139,9 @@ summary(lin.mod.epinew)
 plot(lin.mod.epinew)
 
 
-ggplot(epi.results.sub, aes(x = population_log, y = EPI.new)) +
-  geom_point() +
-  stat_smooth(method = "lm")
+ggplot(epi.results.sub, aes(x = population_log, y = EPI.new)) +   geom_point() +   stat_smooth(method = "lm")
 
-ggplot(lin.mod.epinew, aes(x = .fitted, y = .resid)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  labs(title='Residual vs. Fitted Values Plot', x='Fitted Values', y='Residuals')
+ggplot(lin.mod.epinew, aes(x = .fitted, y = .resid)) +   geom_point() +   geom_hline(yintercept = 0) +   labs(title='Residual vs. Fitted Values Plot', x='Fitted Values', y='Residuals')
 
 
 
@@ -162,22 +162,32 @@ ggplot(lin.mod.pop, aes(x = .fitted, y = .resid)) +
   geom_point() +
   geom_hline(yintercept = 0) +
   labs(title='Residual vs. Fitted Values Plot', x='Fitted Values', y='Residuals')
+```
+
 
 #Boxplot comparing 3 variables
+```{R}
 boxplot(epi.results$EPI.new, epi.results$ECO.new, epi.results$BDH.new )
+```
+
 
 #Q-Q plots for 3 variables compared to some known distribution
+```{R}
 qqplot(qnorm(ppoints(200)),epi.results$EPI.new)
 qqplot(qnorm(ppoints(200)),epi.results$ECO.new)
 qqplot(qnorm(ppoints(200)),epi.results$BDH.new)
+```
 
 #ECDF plots for 3 variables compared to each other
+```{R}
 plot(ecdf(rnorm(1000, 45, 10)), do.points=FALSE, main="ECDF compareF")
 lines(ecdf(epi.results$EPI.new))
 lines(ecdf(epi.results$ECO.new))
 lines(ecdf(epi.results$BDH.new))
+```
 
 #Summary stats and select plots from 3 linear models
+```{R}
 
 # Model 1: MKP.new predicted by BDH.new
 lin.mod1 <- lm(MKP.new ~ BDH.new, data = epi.results.sub)
@@ -199,7 +209,6 @@ summary(lin.mod2)
 plot(lin.mod2)
 ggplot(epi.results.sub, aes(x =  ECO.new, y = MKP.new)) +   geom_point() +  stat_smooth(method = "lm")
 ggplot(lin.mod2, aes(x = .fitted, y = .resid)) +  geom_point() +  geom_hline(yintercept= 0) +   labs(title='Residual vs. Fitted Values Plot', x='Fitted Values', y='Residuals')
-
 
 
 # Model 3: ECO.new predicted by BDH.new 
