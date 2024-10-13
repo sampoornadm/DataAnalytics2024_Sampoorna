@@ -1,10 +1,10 @@
 library("class")
 library("e1071")
 library("ggplot2")
-
-epi<- epi2024results_DA_F24_lab03
+setwd("/Lab3_Assignment2")
+epi<- read.csv('Lab3_Assignment2/epi2024results_DA_F24_lab03.csv')
 attach(epi)
-
+getwd()
 episub1 <-subset(epi,region=='Southern Asia')
 attach(episub1)
 
