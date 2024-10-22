@@ -1,0 +1,336 @@
+*Initializing libraries*
+```{r}
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(MASS)     
+```
+*Defining methods for the tasks in the project*
+```{r}
+
+# Define a function to load and prepare data
+load_data <- function(file_path) {
+  data <- read.csv(file_path)
+  data$date <- as.Date(data$date)
+  data$logcases <- log10(data$cases)
+  data$logdeaths <- log10(data$deaths)
+  return(data)
+}
+
+# Define a function to create boxplots comparing years
+create_boxplot <- function(data1, data2, title, y_label) {
+  boxplot(data1[data1 != -Inf], data2[data2 != -Inf], 
+          outline = FALSE,
+          names = c("2020", "2021"),
+          main = title,
+          ylab = y_label)
+}
+
+# Function to summarize cases by month
+summarize_by_day <- function(data, column) {
+  data %>%
+    mutate(month = floor_date(date, "day")) %>%
+    group_by(month) %>%
+    summarise(total = sum({{column}}, na.rm = TRUE))
+}
+
+# Function to create a bar plot for monthly totals
+plot_daily_totals <- function(summary_data, title, y_label, fill_color) {
+  ggplot(summary_data, aes(x = month, y = total)) +
+    geom_col(fill = fill_color) +
+    labs(title = title, x = "Month", y = y_label) +
+    theme_minimal() +
+    scale_x_date(date_labels = "%B", date_breaks = "1 month")
+}
+
+# Define a function to filter data within the IQR range
+filter_iqr <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)  # 1st quartile
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)  # 3rd quartile
+  IQR_value <- IQR(x, na.rm = TRUE)      # Interquartile range
+  filtered <- x[x >= (Q1 - 1.5 * IQR_value) & x <= (Q3 + 1.5 * IQR_value)]
+  return(filtered)
+}
+# Function to plot histogram with density overlay
+plot_hist_density <- function(data, title, binwidth, x_label = "Values") {
+  ggplot(data.frame(data), aes(x = data)) +
+    geom_histogram(aes(y = ..density..), binwidth = binwidth, color = "black", fill = "lightblue") + 
+    geom_density(color = "red", linewidth = 1) +
+    ggtitle(title) +
+    xlab(x_label) +
+    theme_minimal()
+}
+
+# Function to fit and plot gamma distribution
+plot_gamma_fit <- function(data, title, binwidth, x_label = "Values") {
+  fit_gamma <- fitdistr(data, "gamma")
+  shape_gamma <- fit_gamma$estimate[1]
+  rate_gamma <- fit_gamma$estimate[2]
+  
+  ggplot(data.frame(data), aes(x = data)) +
+    geom_histogram(aes(y = ..density..), binwidth = binwidth, color = "black", fill = "lightblue") +
+    stat_function(fun = dgamma, args = list(shape = shape_gamma, rate = rate_gamma), color = "red", size = 1) +
+    ggtitle(title) +
+    xlab(x_label) +
+    ylab("Density") +
+    theme_minimal()
+}
+
+# Function to plot ECDF
+plot_ecdf <- function(data, title, x_label = "Values") {
+  ggplot(data.frame(data), aes(x = data)) +
+    stat_ecdf(geom = "step", color = "blue") +
+    ggtitle(title) +
+    xlab(x_label) +
+    ylab("ECDF") +
+    theme_minimal()
+}
+
+# Function to create Q-Q plots against Gamma distribution
+plot_qq_gamma <- function(data, title) {
+  fit_gamma <- fitdistr(data, "gamma")
+  shape <- fit_gamma$estimate[1]
+  rate <- fit_gamma$estimate[2]
+  n <- length(data)
+  theoretical_quantiles <- qgamma(ppoints(n), shape = shape, rate = rate)
+  qq_data <- data.frame(Observed = sort(data), Theoretical = theoretical_quantiles)
+  
+  ggplot(qq_data, aes(x = Theoretical, y = Observed)) +
+    geom_point() +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+    ggtitle(title) +
+    xlab("Theoretical Quantiles (Gamma)") +
+    ylab("Observed Quantiles") +
+    theme_minimal()
+}
+
+# Define a function to filter data by state
+filter_by_state <- function(data, states) {
+  filtered_data <- subset(data, state %in% states)
+  return(filtered_data)
+}
+```
+
+*Attach Data File*
+```{r}
+Covid2020 <- load_data('us-counties-2020.csv')
+Covid2021 <- load_data('us-counties-2021.csv')
+```
+
+# Question 1
+
+## 1a:Create boxplots for the “Cases” and “Deaths” variables comparing the variables between the 2 datasets, i.e. two figures (one for each variable) with 2 boxplots (for the 2 different datasets) in each. Describe and run summary statistics on the two chosen variables and explain them in your words. min. 2-3 sentences (2%)
+
+*The data is very large and contains many outliers. Hence taking log of the data to do a box plot, so that maximum amount of data can be captured. Also plotting the box plot without the outliers to display a smooth graph. Few of the higher values are hence not captured*
+
+```{r}
+# Create boxplots comparing 2020 and 2021 for cases and deaths
+create_boxplot(Covid2020$logcases, Covid2021$logcases, "Comparison of COVID-19 Cases in 2020 and 2021", "Log of Cases")
+create_boxplot(Covid2020$logdeaths, Covid2021$logdeaths, "Comparison of COVID-19 Deaths in 2020 and 2021", "Log of Deaths")
+```
+*Capturing the summary of all original data along with the log data to understand the above box plot better*
+```{r}
+# Summary statistics for Cases
+print("Summary 2020 cases")
+summary(Covid2020$cases)
+summary(Covid2020$logcases[Covid2020$logcases!=-Inf])
+print("Summary 2021 cases")
+summary(Covid2021$cases)
+summary(Covid2021$logcases[Covid2021$logcases!=-Inf])
+
+# Summary statistics for Deaths
+print("Summary 2020 Deaths")
+summary(Covid2020$deaths)
+summary(Covid2020$logdeaths[Covid2020$logdeaths!=-Inf])
+print("Summary 2021 Deaths")
+summary(Covid2021$deaths)
+summary(Covid2021$logdeaths[Covid2021$logdeaths!=-Inf])
+```
+*The range of this dataset is very big. The minimum and maximum value of the number of cases in 2020 are 0 and 770915 with a mean value of 1952. The minimum and maximum value of the number of deaths in 2020 are 0 and 25144 with a mean value of 53.6.The minimum and maximum value of the number of cases in 2021 are 0 and 1697286  with a mean value of 11160.The minimum and maximum value of the number of deaths in 2021 are 0 and 35382 with a mean value of 193.6.*
+
+*Plotting the number of covid cases and deaths for both 2020 and 2021 in each month to understand the data*
+```{r Number of cases in each month comparison}
+Covid2020$date <- as.Date(Covid2020$date)
+Covid2021$date <- as.Date(Covid2021$date)
+
+# Summarize Cases for 2020 and 2021
+cases_by_day_2020 <- summarize_by_day(Covid2020, cases)
+cases_by_day_2021 <- summarize_by_day(Covid2021, cases)
+
+# Plot total cases by day for 2020 and 2021
+plot_daily_totals(cases_by_day_2020, "Total COVID-19 Cases by day (2020)", "Total Cases", "lightblue")
+plot_daily_totals(cases_by_day_2021, "Total COVID-19 Cases by day (2021)", "Total Cases", "lightpink")
+
+# Summarize deaths for 2020 and 2021
+deaths_by_day_2020 <- summarize_by_day(Covid2020, deaths)
+deaths_by_day_2021 <- summarize_by_day(Covid2021, deaths)
+
+# Plot total deaths by day for 2020 and 2021
+plot_daily_totals(deaths_by_day_2020, "Total COVID-19 Deaths by day (2020)", "Total Deaths", "darkblue")
+plot_daily_totals(deaths_by_day_2021, "Total COVID-19 Deaths by day (2021)", "Total Deaths", "darkgreen")
+```
+*The above graphs explains that the no of cases and deaths in both the datasets for 2020 and 2021 are stored in cumulative format.*
+
+## 1b:Create histograms for those two variables in the 2 datasets (you choose the histogram bin width). Describe the distributions in terms of known parametric distributions and similarities/ differences among them. Plot the distribution you think matches the histogram (e.g. normal, chis-square, gamma, t-distribution, etc.) overlayed on the histogram. min. 2-3 sentences
+
+*Analyzing 2020 data*
+```{r}
+# Filtering IQR for both cases and deaths for 2020
+cases_iqr_2020 <- filter_iqr(Covid2020$cases)
+deaths_iqr_2020 <- filter_iqr(Covid2020$deaths)
+
+# Remove non-positive values to capture a better graph
+cases_iqr_2020 <- cases_iqr_2020[cases_iqr_2020 > 0 & !is.na(cases_iqr_2020) & is.finite(cases_iqr_2020)]
+deaths_iqr_2020 <- deaths_iqr_2020[deaths_iqr_2020 > 0 & !is.na(deaths_iqr_2020) & is.finite(deaths_iqr_2020)]
+
+# Plot histogram and density for cases and deaths in 2020
+plot_hist_density(cases_iqr_2020, "Histogram of COVID 2020 Cases with Density Overlay", binwidth = 10)
+plot_hist_density(deaths_iqr_2020, "Histogram of COVID 2020 Deaths with Density Overlay", binwidth = 1)
+```
+*Since the data in both the above histograms are continuous, positive and have skewed distribution. I think Gamma distribution would be the best fit for both the graphs.*
+
+```{r fitting gamma distribution in the cases plot 2020}
+suppressWarnings({
+print(plot_gamma_fit(cases_iqr_2020, "Histogram of COVID Cases (IQR Filtered) with Gamma Distribution Overlay (2020)", binwidth = 10))
+
+print(plot_gamma_fit(deaths_iqr_2020, "Histogram of COVID Deaths (IQR Filtered) with Gamma Distribution Overlay (2020)", binwidth = 1))
+})
+```
+
+*Analyzing 2021 data*
+```{r}
+# Repeat for 2021
+cases_iqr_2021 <- filter_iqr(Covid2021$cases)
+deaths_iqr_2021 <- filter_iqr(Covid2021$deaths)
+
+# Plot histogram and density for cases and deaths in 2021
+suppressWarnings({
+print(plot_hist_density(cases_iqr_2021, "Histogram of COVID 2021 Cases with Density Overlay", binwidth = 100))
+print(plot_hist_density(deaths_iqr_2021, "Histogram of COVID 2021 Deaths with Density Overlay", binwidth = 10))
+})
+```
+*Similar to the 2020 data since the data in both the above histograms are continuous, positive and have skewed distribution. I think Gamma distribution would be the best fit for both the graphs. Since the range of covid cases are very large the gamma fitting cannot be done in the plot.*
+```{r fitting gamma distribution in the cases plot 2021}
+# Remove non-positive values and fit gamma distribution for 2021 cases and deaths
+cases_iqr_2021 <- cases_iqr_2021[cases_iqr_2021 > 0 & !is.na(cases_iqr_2021) & is.finite(cases_iqr_2021)]
+deaths_iqr_2021 <- deaths_iqr_2021[deaths_iqr_2021 > 0 & !is.na(deaths_iqr_2021) & is.finite(deaths_iqr_2021)]
+suppressWarnings({
+#plot_gamma_fit(cases_iqr_2021, "Histogram of COVID Cases (IQR Filtered) with Gamma Distribution Overlay (2021)", binwidth = 100)
+print(plot_gamma_fit(deaths_iqr_2021, "Histogram of COVID Deaths (IQR Filtered) with Gamma Distribution Overlay (2021)", binwidth = 1))
+})
+```
+## 1c: Plot the ECDFs (Empirical Cumulative Distribution Function) for the two variables in both datasets. Plot the quantile-quantile distribution using a suitable parametric distribution you chose in 1b. Describe features of these plots. min. 2-3 sentences
+```{r ECDF plots}
+# Plot ECDF for 2020 Cases and Deaths
+
+plot_ecdf(cases_by_day_2020$total, "ECDF of COVID 2020 Cases", "Cases")
+plot_ecdf(deaths_by_day_2020$total, "ECDF of COVID 2020 Deaths", "Deaths")
+
+# Plot ECDF for 2021 Cases and Deaths
+plot_ecdf(cases_by_day_2021$total, "ECDF of COVID 2021 Cases", "Cases")
+plot_ecdf(deaths_by_day_2021$total, "ECDF of COVID 2021 Deaths", "Deaths")
+```
+*From the ECDF graph it is evident that in 2020 the total covid-19 cases was initially increasing slowly with a P-50 of around 3m. Later from the second half of 2020 to 2021 the number of covid cases increased faster. The 2021 graph has a comparatively gradual increase. *
+*There were very few deaths in the first quarter of the year. But later through the remaining of 2020 and 2021, the number of deaths gradually increased at a much faster rate. And, in the second half of 2021 the increase in death rate was much slower. *
+
+```{r capturing all the QQ plot}
+suppressWarnings({
+# Q-Q Plot against Gamma distribution for 2020 Cases and Deaths
+print(plot_qq_gamma(cases_iqr_2020, "Q-Q Plot of COVID 2020 Cases Against Fitted Gamma Distribution"))
+print(plot_qq_gamma(deaths_iqr_2020, "Q-Q Plot of COVID 2020 Deaths Against Fitted Gamma Distribution"))
+
+# Q-Q Plot against Gamma distribution for 2021 Cases and Deaths
+#print(plot_qq_gamma(cases_iqr_2021, "Q-Q Plot of COVID 2021 Cases Against Fitted Gamma Distribution"))
+print(plot_qq_gamma(deaths_iqr_2021, "Q-Q Plot of COVID 2021 Deaths Against Fitted Gamma Distribution"))
+})
+```
+*The above graphs explain that till a certain value in all the graphs both the theoretical(values generated from the model) and observed value are same. But later there is a sudden increase in the theoritical value, and a large change is observed.*
+
+# Question 2
+## Filter the distributions you explored in Q1 by a number of states or counties. Repeat Q1b, Q1c and Q1d and draw any conclusions from this study. min. 3-4 sentences
+```{r}
+# Filter data for specific states
+states <- c("New York", "Washington", "Illinois", "California")
+Covid2020StateFiltered <- filter_by_state(Covid2020, states)
+Covid2021StateFiltered <- filter_by_state(Covid2021, states)
+
+# Create boxplots comparing 2020 and 2021 for cases and deaths
+create_boxplot(Covid2020StateFiltered$logcases, Covid2021StateFiltered$logcases, "Comparison of COVID-19 Cases in 2020 and 2021", "Log of Cases")
+create_boxplot(Covid2020StateFiltered$logdeaths, Covid2021StateFiltered$logdeaths, "Comparison of COVID-19 Deaths in 2020 and 2021", "Log of Deaths")
+
+summary(Covid2020StateFiltered$cases)
+summary(Covid2020StateFiltered$logcases[Covid2020StateFiltered$logcases!=-Inf])
+summary(Covid2021StateFiltered$cases)
+summary(Covid2021StateFiltered$logcases[Covid2021StateFiltered$logcases!=-Inf])
+
+summary(Covid2020StateFiltered$deaths)
+summary(Covid2020StateFiltered$logdeaths[Covid2020StateFiltered$logdeaths!=-Inf])
+summary(Covid2021StateFiltered$deaths)
+summary(Covid2021StateFiltered$logdeaths[Covid2021StateFiltered$logdeaths!=-Inf])
+
+
+# Summarize Cases for 2020 and 2021
+cases_by_day_2020_new <- summarize_by_day(Covid2020StateFiltered, cases)
+cases_by_day_2021_new <- summarize_by_day(Covid2021StateFiltered, cases)
+
+# Plot total cases by day for 2020 and 2021
+plot_daily_totals(cases_by_day_2020_new, "Total COVID-19 Cases by day (2020)", "Total Cases", "lightblue")
+plot_daily_totals(cases_by_day_2021_new, "Total COVID-19 Cases by day (2021)", "Total Cases", "lightpink")
+
+# Summarize deaths for 2020 and 2021
+deaths_by_day_2020_new <- summarize_by_day(Covid2020StateFiltered, deaths)
+deaths_by_day_2021_new <- summarize_by_day(Covid2021StateFiltered, deaths)
+
+# Plot total deaths by day for 2020 and 2021
+plot_daily_totals(deaths_by_day_2020_new, "Total COVID-19 Deaths by day (2020)", "Total Deaths", "darkblue")
+plot_daily_totals(deaths_by_day_2021_new, "Total COVID-19 Deaths by day (2021)", "Total Deaths", "darkgreen")
+
+# Filtering IQR for both cases and deaths for 2020
+cases_iqr_2020_new <- filter_iqr(Covid2020StateFiltered$cases)
+deaths_iqr_2020_new <- filter_iqr(Covid2020StateFiltered$deaths)
+suppressWarnings({
+# Plot histogram and density for cases and deaths in 2020
+print(plot_hist_density(cases_iqr_2020_new, "Histogram of COVID 2020 Cases with Density Overlay", binwidth = 100))
+print(plot_hist_density(deaths_iqr_2020_new, "Histogram of COVID 2020 Deaths with Density Overlay", binwidth = 1))
+
+# Remove non-positive values and fit gamma distribution for 2020 cases and deaths
+cases_iqr_2020_new <- cases_iqr_2020_new[cases_iqr_2020_new > 0]
+deaths_iqr_2020_new <- deaths_iqr_2020_new[deaths_iqr_2020_new > 0 & !is.na(deaths_iqr_2020_new)]
+
+#plot_gamma_fit(cases_iqr_2020_new, "Histogram of COVID Cases (IQR Filtered) with Gamma Distribution Overlay (2020)", binwidth = 10)
+print(plot_gamma_fit(deaths_iqr_2020_new, "Histogram of COVID Deaths (IQR Filtered) with Gamma Distribution Overlay (2020)", binwidth = 1))
+
+# Repeat for 2021
+cases_iqr_2021_new <- filter_iqr(Covid2021$cases)
+deaths_iqr_2021_new <- filter_iqr(Covid2021$deaths)
+
+# Plot histogram and density for cases and deaths in 2021
+print(plot_hist_density(cases_iqr_2021_new, "Histogram of COVID 2021 Cases with Density Overlay", binwidth = 100))
+print(plot_hist_density(deaths_iqr_2021_new, "Histogram of COVID 2021 Deaths with Density Overlay", binwidth = 10))
+
+# Remove non-positive values and fit gamma distribution for 2021 cases and deaths
+cases_iqr_2021_new <- cases_iqr_2021_new[cases_iqr_2021_new > 0 & !is.na(cases_iqr_2021_new) & is.finite(cases_iqr_2021_new)]
+deaths_iqr_2021_new <- deaths_iqr_2021_new[deaths_iqr_2021_new > 0 & !is.na(deaths_iqr_2021_new) & is.finite(deaths_iqr_2021_new)]
+
+#plot_gamma_fit(cases_iqr_2021_new, "Histogram of COVID Cases (IQR Filtered) with Gamma Distribution Overlay (2021)", binwidth = 100)
+print(plot_gamma_fit(deaths_iqr_2021_new, "Histogram of COVID Deaths (IQR Filtered) with Gamma Distribution Overlay (2021)", binwidth = 1))
+
+# Plot ECDF for 2020 Cases and Deaths
+print(plot_ecdf(cases_by_day_2020_new$total, "ECDF of COVID 2020 Cases", "Cases"))
+print(plot_ecdf(deaths_by_day_2020_new$total, "ECDF of COVID 2020 Deaths", "Deaths"))
+
+# Plot ECDF for 2021 Cases and Deaths
+print(plot_ecdf(cases_by_day_2021_new$total, "ECDF of COVID 2021 Cases", "Cases"))
+print(plot_ecdf(deaths_by_day_2021_new$total, "ECDF of COVID 2021 Deaths", "Deaths"))
+
+# Q-Q Plot against Gamma distribution for 2020 Cases and Deaths
+#print(plot_qq_gamma(cases_iqr_2020_new, "Q-Q Plot of COVID 2020 Cases Against Fitted Gamma Distribution"))
+print(plot_qq_gamma(deaths_iqr_2020_new, "Q-Q Plot of COVID 2020 Deaths Against Fitted Gamma Distribution"))
+
+# Q-Q Plot against Gamma distribution for 2021 Cases and Deaths
+#print(plot_qq_gamma(cases_iqr_2021_new, "Q-Q Plot of COVID 2021 Cases Against Fitted Gamma Distribution"))
+print(plot_qq_gamma(deaths_iqr_2021_new, "Q-Q Plot of COVID 2021 Deaths Against Fitted Gamma Distribution"))
+})
+```
+
+*After sub-setting the data for 5 states, the graphs show a similar trend. Since the data is cumulative, the histograms plotted for number of cases each day and number of deaths each day shows an increasing trend. The box plot and the summary tells us that the range of data is very big. There are been a consistent sharp increase in the number of deaths and number of cases in the years 2020 and 2021. The ECDF plot explains that the number of cases was minimal in the first quarter of 2020. Even in the first half of the year 2020. But later with time the number of cases began to rise significantly. The ECDF plot of number of deaths also shows that in the first quarter, the number of deaths was minimal. Then in the second quarter, the number of deaths increased significantly.The number of deaths in the second half of 2020 increased slowly compared to the second quarter.Again in the half half of 2021, the number of deaths significantly. But in the second half of 2021, the  increase in number of deaths was relatively slower. The trend in the QQ plot is similar to the original dataset.*

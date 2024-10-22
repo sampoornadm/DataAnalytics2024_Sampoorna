@@ -1,0 +1,100 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r}
+library(ggplot2)
+```
+
+*Reading the data file*
+```{r}
+NYHouse <- read.csv('NY-House-Dataset.csv')
+attach(NYHouse)
+```
+
+# Question 3
+## a) Fit a linear model using the formula PRICE ~ BEDS + BATH + PROPERTYSQFT and identify the variable most significantly influencing house price. Produce a scatterplot of that variable with another and overlay the best fit line. Plot the residuals of the linear model. min. 2-3 sentences
+```{r}
+# Fit the linear model
+model <- lm(PRICE ~ BEDS + BATH + PROPERTYSQFT, data = NYHouse)
+
+# Summary of the model to check the significance of variables
+summary(model)
+
+# Scatterplot of PROPERTYSQFT vs BATH with best fit line
+ggplot(NYHouse, aes(x = PROPERTYSQFT, y = BATH)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  labs(title = "Scatterplot of Property Size vs Bath",
+       x = "Property Size (sqft)",
+       y = "Bath") +
+  theme_minimal()
+
+# Scatterplot of PROPERTYSQFT vs PRICE with best fit line
+ggplot(NYHouse, aes(x = PROPERTYSQFT, y = PRICE)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  labs(title = "Scatterplot of Property Size vs Bath",
+       x = "Property Size (sqft)",
+       y = "Price") +
+  theme_minimal()
+
+# Plot the residuals
+residuals <- model$residuals
+
+# Residual plot
+ggplot(NYHouse, aes(x = fitted(model), y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals of the Linear Model",
+       x = "Fitted Values",
+       y = "Residuals") +
+  theme_minimal()
+
+```
+*The most significantly influencing variable for the house price is 'PROPERTYSQFT.'The residuals graph displays the errors for each data point over the fitted value. This graph explains that there is one outlier in the graph but the remaining values are smooth. *
+
+## b) Derive a subset of the dataset according to any criteria (e.g. PRICE > VALUE or BEDS < NUMBER) and repeat the linear model with its plots. Explain how the significance of the input variables changes and your interpretation of the change. min. 2-3 sentences
+```{r}
+
+# Create a subset of the dataset where PRICE > 500000
+subset_NYHouse <- subset(NYHouse, PRICE > 500000)
+
+# Fit the linear model on the subset
+model_subset <- lm(PRICE ~ BEDS + BATH + PROPERTYSQFT, data = subset_NYHouse)
+
+# Summary of the new model
+summary(model_subset)
+
+# Scatterplot of PROPERTYSQFT vs BATH with best fit line for the subset
+ggplot(subset_NYHouse, aes(x = PROPERTYSQFT, y = BATH)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  labs(title = "Scatterplot of Property Size vs Bath (Subset)",
+       x = "Property Size (sqft)",
+       y = "Bath") +
+  theme_minimal()
+
+# Scatterplot of PROPERTYSQFT vs PRICE with best fit line for the subset
+ggplot(subset_NYHouse, aes(x = PROPERTYSQFT, y = PRICE)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  labs(title = "Scatterplot of Property Size vs Price (Subset)",
+       x = "Property Size (sqft)",
+       y = "Price") +
+  theme_minimal()
+
+# Plot the residuals for the subset
+residuals_subset <- model_subset$residuals
+
+# Residual plot for the subset
+ggplot(subset_NYHouse, aes(x = fitted(model_subset), y = residuals_subset)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(title = "Residuals of the Linear Model (Subset)",
+       x = "Fitted Values",
+       y = "Residuals") +
+  theme_minimal()
+```
+*Even after taking a subset of value PROPERTYSQFT is the most significant value. There is no significant change in the trend in graphs of the original and subset dataset. The residuals plot still has the outlier, this shows that the outlier value has PRICE > 500000*
