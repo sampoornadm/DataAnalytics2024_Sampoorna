@@ -1,0 +1,164 @@
+#initializing libraries
+```{r}
+library(rattle)
+library(ggfortify)
+library(e1071)
+library(caret)
+library(class)
+library(psych)
+```
+
+# initializing wine data and visualizing data
+```{r}
+data(wine)
+str(wine)
+
+sum(is.na(wine))
+
+summary(wine)
+pairs.panels(wine[,-1],gap = 0,bg = c("red", "yellow", "blue")[wine$Type],pch=21)
+```
+
+#Question 1:Compute the PCs and plot the dataset using the 1st and 2nd PC.
+```{r}
+principal_components<-prcomp(wine[,-1], center = TRUE, scale. = TRUE)
+
+summary(principal_components)
+principal_components$rotation
+
+
+# Plot the first and second PCs using autoplot
+autoplot(principal_components, data = wine, colour = 'Type',
+         x = 1, y = 2, # specify the 1st and 2nd PC
+         loadings = TRUE, loadings.colour = 'blue', 
+         loadings.label = TRUE, loadings.label.size = 3) +
+  ggtitle("Wine Dataset PCA - 1st and 2nd Principal Components")
+```
+
+#Question 2: Identify the variables that contribute the most to the 1stPC.
+```{r}
+loadings <- principal_components$rotation[, 1]
+top_contributors <- names(sort((loadings), decreasing = TRUE)[1:3])
+print("Top contributors to the 1st PC:")
+print(top_contributors)
+```
+
+#Question 3: Train a classifier model to predict wine type using the 13 attributes
+```{r}
+knn.predall <- knn(train = wine[,-1], test = wine[,-1], cl = wine$Type, k = 5)
+
+## evaluate
+cm_all <- table(Predicted=knn.predall, Actual = wine$Type, dnn=list('predicted','actual'))
+
+cm_all
+
+n = sum(cm_all) # number of instances
+nc = nrow(cm_all) # number of classes
+diag = diag(cm_all) # number of correctly classified instances per class 
+rowsums = apply(cm_all, 1, sum) # number of instances per class
+colsums = apply(cm_all, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+precision_all = diag / colsums 
+recall_all = diag / rowsums 
+f1_all = 2 * precision * recall / (precision + recall) 
+
+data.frame(recall_all, precision_all, f1_all)
+```
+
+#Question 4: Train a classifier model to predict wine type using the data projected into the first 3 PCs.
+```{r}
+wine.pc <- princomp(wine[,-1], cor = TRUE, score = TRUE)
+knn.pred_pc3 <- knn(train = wine.pc$scores[,c(1,2,3)], test = wine.pc$scores[,c(1,2,3)], cl = wine$Type, k = 5)
+
+## evaluate
+cm_pc3 <- table(Predicted=knn.pred_pc3, Actual = wine$Type, dnn=list('predicted','actual'))
+
+cm_pc3
+
+n = sum(cm_pc3) # number of instances
+nc = nrow(cm_pc3) # number of classes
+diag = diag(cm_pc3) # number of correctly classified instances per class 
+rowsums = apply(cm_pc3, 1, sum) # number of instances per class
+colsums = apply(cm_pc3, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+precision_pc3 = diag / colsums 
+recall_pc3 = diag / rowsums 
+f1_pc3 = 2 * precision * recall / (precision + recall) 
+
+data.frame(recall_pc3, precision_pc3, f1_pc3)
+
+```
+
+#Question 5: Drop the variables least contributing to the 1stPC and rerun PCA.
+```{r}
+loadings <- principal_components$rotation[, 1]
+least_contributors <- names(sort((loadings), decreasing = FALSE)[1:3])
+print("Least contributors to the 1st PC:")
+print(least_contributors)
+```
+```{r}
+#creating new dataset
+wine.new= wine[c("Type","Alcohol","Malic","Ash","Alcalinity","Magnesium","Nonflavanoids","Proanthocyanins","Color","Hue","Proline")]
+principal_components.new<-prcomp(wine.new[,-1], center = TRUE, scale. = TRUE)
+
+summary(principal_components.new)
+principal_components.new$rotation
+
+
+# using the plot() function, we can plot the principal components.
+plot(principal_components.new)
+
+# plotting the principal_components using the a line in plot() functions 
+plot(principal_components.new, type = "l")
+
+# using rhw biplot() function we can plot the components
+biplot(principal_components.new)
+
+## using autoplot() function to plot the components
+autoplot(principal_components.new, data = wine.new, colour = 'Type',
+         loadings = TRUE, loadings.colour = 'blue',
+         loadings.label = TRUE, loadings.label.size = 3)
+```
+
+#Question 6: Train a classifier model to predict wine type using the data projected into the first 3 PCs after rerunning PCA.
+```{r}
+wine.pc.new <- princomp(wine.new[,-1], cor = TRUE, score = TRUE)
+knn.pred_pc3.new <- knn(train = wine.pc.new$scores[,c(1,2,3)], test = wine.pc.new$scores[,c(1,2,3)], cl = wine.new$Type, k = 5)
+
+## evaluate
+cm_pc3.new <- table(Predicted=knn.pred_pc3.new, Actual = wine.new$Type, dnn=list('predicted','actual'))
+
+cm_pc3.new
+
+n = sum(cm_pc3.new) # number of instances
+nc = nrow(cm_pc3.new) # number of classes
+diag = diag(cm_pc3.new) # number of correctly classified instances per class 
+rowsums = apply(cm_pc3.new, 1, sum) # number of instances per class
+colsums = apply(cm_pc3.new, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted 
+
+precision_pc3.new = diag / colsums 
+recall_pc3.new = diag / rowsums 
+f1_pc3.new = 2 * precision * recall / (precision + recall) 
+
+data.frame(recall_pc3.new, precision_pc3.new, f1_pc3.new)
+```
+
+#Question 7:Compare the 3 classification models using contingency tables and prevision/recall/f1 metrics
+```{r}
+print("Original Dataset Results")
+cm
+data.frame(recall, precision, f1)
+print("Original Dataset Results after PCA")
+cm_pc3
+data.frame(recall_pc3, precision_pc3, f1_pc3)
+print("Dataset Results after removing columns \"Flavanoids\" \"Phenols\"    \"Dilution\"  and then doing PCA")
+cm_pc3.new
+data.frame(recall_pc3.new, precision_pc3.new, f1_pc3.new)
+```
+
